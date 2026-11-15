@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { NavLink, Route, Routes, useLocation } from 'react-router-dom';
-import { Activity, BarChart3, Database, FlaskConical, Layers, ShieldCheck, Sparkles, FileText, Menu, X, Download, RefreshCw, Send, ChevronRight } from 'lucide-react';
+import { Activity, BarChart3, Database, FlaskConical, Layers, ShieldCheck, Sparkles, FileText, Menu, X, Download, RefreshCw, Send, ChevronRight, Moon, Sun } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line, Legend } from 'recharts';
 import { api } from './services/api';
 
@@ -10,7 +10,7 @@ const links = [
   ['F-Test Analysis', '/f-test', FlaskConical], ['Reliability Prediction', '/reliability', ShieldCheck],
   ['AI Insights', '/insights', Sparkles], ['Reports', '/reports', FileText],
 ];
-const chartColors = { navy: '#244b73', teal: '#347f7c', amber: '#b7791f', violet: '#76679c', grid: '#e5e8ec', text: '#737b87' };
+const chartColors = { navy: '#244b73', teal: '#347f7c', amber: '#b7791f', violet: '#76679c', grid: 'var(--chart-grid)', text: 'var(--chart-text)' };
 
 export default function App() {
   const [sets, setSets] = useState([]);
@@ -19,7 +19,13 @@ export default function App() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [mobile, setMobile] = useState(false);
+  const [theme, setTheme] = useState(() => localStorage.getItem('machinepred-theme') || 'light');
   const loc = useLocation();
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem('machinepred-theme', theme);
+  }, [theme]);
 
   async function loadDatasets() {
     try {
@@ -63,7 +69,7 @@ export default function App() {
 
   const page = links.find(x => x[1] === loc.pathname)?.[0] || 'Overview';
   const common = { id, data, sets, error, busy, generate };
-  return <div className="app-shell">
+  return <div className={`app-shell ${theme === 'dark' ? 'dark-theme' : ''}`}>
     <aside className={`sidebar ${mobile ? 'is-open' : ''}`}>
       <NavLink to="/" className="brand" onClick={() => setMobile(false)}>
         <span className="brand-mark"><Activity size={19}/></span>
@@ -79,7 +85,7 @@ export default function App() {
       <header className="topbar">
         <button className="menu-button" aria-label="Open navigation" onClick={() => setMobile(true)}><Menu size={21}/></button>
         <div className="page-title"><div className="breadcrumbs">MACHINEPRED <ChevronRight size={12}/> ANALYSIS</div><h1>{page}</h1></div>
-        <div className="header-controls"><label className="dataset-control"><span>Active dataset</span><select aria-label="Select active dataset" value={id} onChange={e => { localStorage.dataset = e.target.value; setId(e.target.value); }}>{sets.map(s => <option key={s.id} value={s.id}>{s.name} · #{s.id}</option>)}</select></label><div className={`system-status ${error?'offline':''}`}><i/>{error?'Unavailable':data?'Connected':'Connecting'}</div></div>
+        <div className="header-controls"><label className="dataset-control"><span>Active dataset</span><select aria-label="Select active dataset" value={id} onChange={e => { localStorage.dataset = e.target.value; setId(e.target.value); }}>{sets.map(s => <option key={s.id} value={s.id}>{s.name} · #{s.id}</option>)}</select></label><div className={`system-status ${error?'offline':''}`}><i/>{error?'Unavailable':data?'Connected':'Connecting'}</div><button className="button button-outline theme-toggle" type="button" aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} aria-pressed={theme === 'dark'} onClick={() => setTheme(current => current === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? <Sun size={15}/> : <Moon size={15}/>}<span>{theme === 'dark' ? 'Light' : 'Dark'} theme</span></button></div>
       </header>
       <div className="page-content">
         {error && <div className="alert" role="alert">{error}</div>}
