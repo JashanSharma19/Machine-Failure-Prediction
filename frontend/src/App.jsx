@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, NavLink, Route, Routes, useLocation } from 'react-router-dom';
+import { Link, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Activity, BarChart3, Database, FlaskConical, Layers, ShieldCheck, Sparkles, FileText, Menu, X, Download, RefreshCw, Send, ChevronRight, Moon, Sun } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line, Legend } from 'recharts';
 import { api } from './services/api';
@@ -24,6 +24,7 @@ export default function App() {
   const [mobile, setMobile] = useState(false);
   const [theme, setTheme] = useState(() => localStorage.getItem('machinepred-theme') || 'light');
   const loc = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -70,6 +71,7 @@ export default function App() {
       setAnalysisLoading(true);
       setId(String(made.id));
       setError('');
+      navigate('/', { replace: true });
     } catch (e) { setError(e.message); }
     finally { setBusy(false); }
   }
