@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { NavLink, Route, Routes, useLocation } from 'react-router-dom';
+import { Link, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { Activity, BarChart3, Database, FlaskConical, Layers, ShieldCheck, Sparkles, FileText, Menu, X, Download, RefreshCw, Send, ChevronRight, Moon, Sun } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line, Legend } from 'recharts';
 import { api } from './services/api';
@@ -11,12 +11,15 @@ const links = [
   ['AI Insights', '/insights', Sparkles], ['Reports', '/reports', FileText],
 ];
 const chartColors = { navy: '#244b73', teal: '#347f7c', amber: '#b7791f', violet: '#76679c', grid: 'var(--chart-grid)', text: 'var(--chart-text)' };
+const DATASET_FLOW_KEY = 'machinepred-manual-first-v1';
 
 export default function App() {
   const [sets, setSets] = useState([]);
-  const [id, setId] = useState(localStorage.dataset || '');
+  const [id, setId] = useState('');
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
+  const [loadingData, setLoadingData] = useState(true);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [mobile, setMobile] = useState(false);
   const [theme, setTheme] = useState(() => localStorage.getItem('machinepred-theme') || 'light');
@@ -31,26 +34,29 @@ export default function App() {
     try {
       setError('');
       let list = await api.datasets();
-      if (!list.length) {
-        const made = await api.generate({ count: 240, groups: ['A', 'B', 'C'], distribution: 'weibull', scale: 520, shape: 1.7, seed: 42 });
-        list = await api.datasets();
-        localStorage.dataset = made.id;
-        setId(String(made.id));
-      } else if (!id || !list.some(x => String(x.id) === String(id))) {
-        localStorage.dataset = list[0].id;
-        setId(String(list[0].id));
+      let savedId = localStorage.getItem('dataset');
+      if (localStorage.getItem(DATASET_FLOW_KEY) !== '1') {
+        localStorage.removeItem('dataset');
+        localStorage.setItem(DATASET_FLOW_KEY, '1');
+        savedId = null;
       }
+      const selected = savedId ? list.find(x => String(x.id) === String(savedId)) : null;
+      if (selected) { localStorage.dataset = selected.id; setId(String(selected.id)); }
+      else { localStorage.removeItem('dataset'); setId(''); setData(null); }
       setSets(list);
     } catch (e) { setError(`${e.message}. Check that the FastAPI service is running.`); }
+    finally { setLoadingData(false); }
   }
 
   useEffect(() => { loadDatasets(); }, []);
   useEffect(() => {
-    if (!id) return;
+    if (!id) { setAnalysisLoading(false); return; }
     let active = true;
+    setAnalysisLoading(true);
     setData(null);
     api.analysis(id).then(result => { if (active) { setData(result); setError(''); } })
-      .catch(e => { if (active) setError(`${e.message}. Check that the FastAPI service is running.`); });
+      .catch(e => { if (active) setError(`${e.message}. Check that the FastAPI service is running.`); })
+      .finally(() => { if (active) setAnalysisLoading(false); });
     return () => { active = false; };
   }, [id]);
 
@@ -61,6 +67,7 @@ export default function App() {
       localStorage.dataset = made.id;
       const list = await api.datasets();
       setSets(list);
+      setAnalysisLoading(true);
       setId(String(made.id));
       setError('');
     } catch (e) { setError(e.message); }
@@ -68,7 +75,7 @@ export default function App() {
   }
 
   const page = links.find(x => x[1] === loc.pathname)?.[0] || 'Overview';
-  const common = { id, data, sets, error, busy, generate };
+  const common = { id, data, sets, error, busy, generate, loadingData };
   return <div className={`app-shell ${theme === 'dark' ? 'dark-theme' : ''}`}>
     <aside className={`sidebar ${mobile ? 'is-open' : ''}`}>
       <NavLink to="/" className="brand" onClick={() => setMobile(false)}>
@@ -85,19 +92,19 @@ export default function App() {
       <header className="topbar">
         <button className="menu-button" aria-label="Open navigation" onClick={() => setMobile(true)}><Menu size={21}/></button>
         <div className="page-title"><div className="breadcrumbs">MACHINEPRED <ChevronRight size={12}/> ANALYSIS</div><h1>{page}</h1></div>
-        <div className="header-controls"><label className="dataset-control"><span>Active dataset</span><select aria-label="Select active dataset" value={id} onChange={e => { localStorage.dataset = e.target.value; setId(e.target.value); }}>{sets.map(s => <option key={s.id} value={s.id}>{s.name} · #{s.id}</option>)}</select></label><div className={`system-status ${error?'offline':''}`}><i/>{error?'Unavailable':data?'Connected':'Connecting'}</div><button className="button button-outline theme-toggle" type="button" aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} aria-pressed={theme === 'dark'} onClick={() => setTheme(current => current === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? <Sun size={15}/> : <Moon size={15}/>}<span>{theme === 'dark' ? 'Light' : 'Dark'} theme</span></button></div>
+        <div className="header-controls"><label className="dataset-control"><span>Saved dataset</span><select aria-label="Select saved dataset" value={id} disabled={!sets.length} onChange={e => { if(e.target.value)localStorage.dataset = e.target.value;else localStorage.removeItem('dataset'); setAnalysisLoading(Boolean(e.target.value)); setId(e.target.value); }}><option value="">{sets.length?'Choose saved dataset':'No saved dataset'}</option>{sets.map(s => <option key={s.id} value={s.id}>{s.name} · #{s.id}</option>)}</select></label><div className={`system-status ${error?'offline':''}`}><i/>{error?'Unavailable':data?'Connected':id?'Connecting':'No dataset'}</div><button className="button button-outline theme-toggle" type="button" aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} aria-pressed={theme === 'dark'} onClick={() => setTheme(current => current === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? <Sun size={15}/> : <Moon size={15}/>}<span>{theme === 'dark' ? 'Light' : 'Dark'} theme</span></button></div>
       </header>
       <div className="page-content">
         {error && <div className="alert" role="alert">{error}</div>}
-        {!data ? <section className="empty-state"><div className="empty-mark"><Activity size={21}/></div><h2>{error ? 'Analysis service unavailable' : 'Loading selected dataset'}</h2><p>{error || 'Retrieving calculated results from the Python analysis service.'}</p><button className="button button-outline" onClick={loadDatasets}><RefreshCw size={15}/> Retry connection</button></section> : <Routes>
+        {(loadingData || (id && analysisLoading)) && !data ? <section className="empty-state"><div className="empty-mark"><Activity size={21}/></div><h2>{id?'Loading analysis results':'Checking saved datasets'}</h2><p>{id?'Retrieving results for the selected dataset.':'Looking for datasets you have already created.'}</p></section> : <Routes>
           <Route path="/" element={<Overview {...common}/>}/>
           <Route path="/simulation" element={<Simulation {...common}/>}/>
-          <Route path="/statistics" element={<Statistics {...common}/>}/>
-          <Route path="/distributions" element={<Distributions {...common}/>}/>
-          <Route path="/f-test" element={<FTest {...common}/>}/>
-          <Route path="/reliability" element={<Reliability {...common}/>}/>
-          <Route path="/insights" element={<Insights {...common}/>}/>
-          <Route path="/reports" element={<Reports {...common}/>}/>
+          <Route path="/statistics" element={<DataRequired data={data}><Statistics {...common}/></DataRequired>}/>
+          <Route path="/distributions" element={<DataRequired data={data}><Distributions {...common}/></DataRequired>}/>
+          <Route path="/f-test" element={<DataRequired data={data}><FTest {...common}/></DataRequired>}/>
+          <Route path="/reliability" element={<DataRequired data={data}><Reliability {...common}/></DataRequired>}/>
+          <Route path="/insights" element={<DataRequired data={data}><Insights {...common}/></DataRequired>}/>
+          <Route path="/reports" element={<DataRequired data={data}><Reports {...common}/></DataRequired>}/>
           <Route path="*" element={<Overview {...common}/>}/>
         </Routes>}
       </div>
@@ -107,6 +114,10 @@ export default function App() {
 
 function PageIntro({eyebrow, title, description, action}) {
   return <div className="page-intro"><div><div className="section-kicker">{eyebrow}</div><h2>{title}</h2><p>{description}</p></div>{action}</div>;
+}
+function DataRequired({data,children}) {
+  if (data) return children;
+  return <section className="empty-state"><div className="empty-mark"><Database size={21}/></div><h2>No dataset selected</h2><p>Enter your simulation settings first, then run the analysis.</p><Link className="button button-primary" to="/simulation">Open Data Simulation</Link></section>;
 }
 function Section({title, subtitle, action, className = '', children}) {
   return <section className={`section ${className}`}><div className="section-head"><div><h3>{title}</h3>{subtitle && <p>{subtitle}</p>}</div>{action}</div>{children}</section>;
@@ -119,10 +130,11 @@ function ChartTooltip({active, payload, label}) {
   return <div className="chart-tooltip"><b>{typeof label === 'number' ? `${Math.round(label)} hours` : label}</b>{payload.map(p => <div key={p.dataKey}><i style={{background:p.color}}/>{p.name || p.dataKey}: {typeof p.value === 'number' ? p.value.toFixed(3) : p.value}</div>)}</div>;
 }
 
-function Overview({data, id, generate, busy}) {
+function Overview({data, id}) {
+  if (!data) return <><PageIntro eyebrow="RELIABILITY OVERVIEW" title="Start a machine reliability analysis" description="Enter the number of machines and simulation settings. Results will appear after you run the analysis."/><section className="empty-state overview-empty"><div className="empty-mark"><Database size={21}/></div><h2>No dataset yet</h2><p>Your data will be generated only after you enter the settings and run the simulation.</p><Link className="button button-primary" to="/simulation">Enter simulation details</Link></section></>;
   const s = data.stats;
   const averageReliability = data.groups.length ? data.groups.reduce((a, g) => a + g.reliability_200, 0) / data.groups.length : 0;
-  const action = <button className="button button-primary" disabled={busy} onClick={() => generate({count:240,groups:['A','B','C'],distribution:'weibull',scale:520,shape:1.7,seed:Math.floor(Math.random()*99999)})}><RefreshCw size={15}/>{busy ? 'Generating…' : 'Generate dataset'}</button>;
+  const action = <Link className="button button-primary" to="/simulation"><RefreshCw size={15}/>New simulation</Link>;
   return <>
     <PageIntro eyebrow="RELIABILITY OVERVIEW" title="Machine performance at a glance" description={`Current analysis uses simulated dataset #${id}. Results are estimates based on the selected population.`} action={action}/>
     <Section title="Key indicators" subtitle="Calculated from the active dataset" className="flush-section">
@@ -146,38 +158,49 @@ function Overview({data, id, generate, busy}) {
   </>;
 }
 
-function Simulation({generate,busy,id}) {
-  const [form,setForm]=useState({count:240,groups:'A,B,C',distribution:'weibull',scale:520,shape:1.7,seed:42,censoring:false,censor_hours:400});
+function Simulation({generate,busy,id,sets}) {
+  const [form,setForm]=useState({count:'',groups:'',distribution:'weibull',scale:'',shape:'',seed:'',censoring:false,censor_hours:''});
   const [rows,setRows]=useState([]),[search,setSearch]=useState(''),[loadingRows,setLoadingRows]=useState(false),[formError,setFormError]=useState('');
-  useEffect(()=>{let active=true;setLoadingRows(true);api.dataset(id).then(d=>{if(active)setRows(d.rows||[])}).catch(()=>{if(active)setRows([])}).finally(()=>{if(active)setLoadingRows(false)});return()=>{active=false}},[id]);
+  useEffect(()=>{if(!id){setRows([]);setLoadingRows(false);return}let active=true;setLoadingRows(true);api.dataset(id).then(d=>{if(active)setRows(d.rows||[])}).catch(()=>{if(active)setRows([])}).finally(()=>{if(active)setLoadingRows(false)});return()=>{active=false}},[id]);
   const filtered=useMemo(()=>rows.filter(r=>`${r.machine_id} ${r.machine_group} ${r.operating_condition}`.toLowerCase().includes(search.toLowerCase())).slice(0,12),[rows,search]);
   function update(key,value){setForm(x=>({...x,[key]:value}));setFormError('')}
-  function submit(){const groups=form.groups.split(',').map(x=>x.trim()).filter(Boolean);if(groups.length<2){setFormError('Enter at least two comma-separated groups.');return}generate({...form,count:Number(form.count),groups,scale:Number(form.scale),shape:Number(form.shape),seed:Number(form.seed),censor_hours:Number(form.censor_hours)})}
+  function submit(){
+    const count=Number(form.count),scale=Number(form.scale),shape=Number(form.shape),seed=form.seed===''?null:Number(form.seed),censorHours=Number(form.censor_hours);
+    const groups=[...new Set(form.groups.split(',').map(x=>x.trim()).filter(Boolean))];
+    if(!Number.isInteger(count)||count<50||count>1000){setFormError('Enter a whole machine count from 50 to 1,000.');return}
+    if(!groups.length||groups.length>8){setFormError('Enter 1–8 comma-separated group names.');return}
+    if(!(scale>0&&Number.isFinite(scale))){setFormError('Enter a scale greater than zero.');return}
+    if(form.distribution==='weibull'&&!(shape>0&&Number.isFinite(shape))){setFormError('Enter a Weibull shape greater than zero.');return}
+    if(seed!==null&&!Number.isInteger(seed)){setFormError('Random seed must be a whole number or left blank.');return}
+    if(form.censoring&&!(censorHours>0&&Number.isFinite(censorHours))){setFormError('Enter a censoring time greater than zero.');return}
+    generate({count,groups,distribution:form.distribution,scale,shape:form.distribution==='weibull'?shape:1.7,seed,censoring:form.censoring,censor_hours:form.censoring?censorHours:400});
+  }
   return <>
-    <PageIntro eyebrow="DATA MANAGEMENT" title="Simulation & dataset" description="Configure a reproducible lifetime sample, generate records and review the active dataset."/>
+    <PageIntro eyebrow="DATA MANAGEMENT" title="Simulation setup" description="Enter the settings for your machine sample, then run the simulation to calculate results."/>
     <div className="content-grid simulation-grid">
-      <Section title="Simulation parameters" subtitle="Runtime observations are generated in the Python backend.">
+      <Section title="Your simulation settings" subtitle="No sample dataset is loaded automatically. Required settings are marked with *.">
         <div className="form-grid">
-          <label>Machine count<input type="number" min="50" max="1000" value={form.count} onChange={e=>update('count',+e.target.value)}/><small>50–1,000 observations</small></label>
-          <label>Machine groups<input value={form.groups} onChange={e=>update('groups',e.target.value)} placeholder="A, B, C"/><small>Comma-separated group names</small></label>
+          <label>Number of machines *<input type="number" min="50" max="1000" step="1" inputMode="numeric" value={form.count} onChange={e=>update('count',e.target.value)} placeholder="e.g. 100"/><small>Whole number from 50 to 1,000</small></label>
+          <label>Machine groups *<input value={form.groups} onChange={e=>update('groups',e.target.value)} placeholder="e.g. A or A, B, C"/><small>One to eight unique names; separate with commas</small></label>
           <label>Lifetime distribution<select value={form.distribution} onChange={e=>update('distribution',e.target.value)}><option value="weibull">Weibull</option><option value="exponential">Exponential</option></select></label>
-          <label>Scale parameter · hours<input type="number" min="1" value={form.scale} onChange={e=>update('scale',+e.target.value)}/></label>
-          {form.distribution==='weibull'&&<label>Shape parameter β<input type="number" min="0.1" step="0.1" value={form.shape} onChange={e=>update('shape',+e.target.value)}/></label>}
-          <label>Random seed<input type="number" value={form.seed} onChange={e=>update('seed',+e.target.value)}/></label>
-          <label className="check-field"><input type="checkbox" checked={form.censoring} onChange={e=>update('censoring',e.target.checked)}/> Include right-censored observations</label>
-          {form.censoring&&<label>Censoring time · hours<input type="number" min="1" value={form.censor_hours} onChange={e=>update('censor_hours',+e.target.value)}/></label>}
+          <label>Scale parameter · hours *<input type="number" min="0" step="any" inputMode="decimal" value={form.scale} onChange={e=>update('scale',e.target.value)} placeholder="e.g. 500"/><small>Must be greater than zero</small></label>
+          {form.distribution==='weibull'&&<label>Weibull shape β *<input type="number" min="0" step="any" inputMode="decimal" value={form.shape} onChange={e=>update('shape',e.target.value)} placeholder="e.g. 1.7"/><small>Must be greater than zero</small></label>}
+          <label>Random seed <input type="number" step="1" inputMode="numeric" value={form.seed} onChange={e=>update('seed',e.target.value)} placeholder="Optional"/><small>Leave blank for a new random sample</small></label>
+          <label className="check-field"><input type="checkbox" checked={form.censoring} onChange={e=>update('censoring',e.target.checked)}/> Include right-censored machines</label>
+          {form.censoring&&<label>Censoring time · hours *<input type="number" min="0" step="any" inputMode="decimal" value={form.censor_hours} onChange={e=>update('censor_hours',e.target.value)} placeholder="e.g. 400"/></label>}
         </div>
         {formError&&<div className="alert" role="alert">{formError}</div>}
-        <button className="button button-primary" disabled={busy} onClick={submit}><RefreshCw size={15}/>{busy?'Generating dataset…':'Generate and save dataset'}</button>
+        <button className="button button-primary" disabled={busy} onClick={submit}><RefreshCw size={15}/>{busy?'Running analysis…':'Run simulation and analyze'}</button>
       </Section>
-      <Section title="Dataset guide" subtitle="What the generated records contain">
-        <dl className="definition-list"><div><dt>Machine ID</dt><dd>Unique record identifier</dd></div><div><dt>Machine group</dt><dd>Assigned comparison cohort</dd></div><div><dt>Operating hours</dt><dd>Observed runtime in hours</dd></div><div><dt>Failure status</dt><dd>1 = observed failure; 0 = right-censored</dd></div><div><dt>Operating condition</dt><dd>Simulated operational context</dd></div></dl>
-        <p className="notice"><b>Simulated data</b><br/>Group shifts and operating conditions are illustrative, for academic analysis only.</p>
+      <Section title="How to enter settings" subtitle="Keep the simulation inputs simple">
+        <dl className="definition-list"><div><dt>Machine count</dt><dd>How many runtimes to simulate.</dd></div><div><dt>Group names</dt><dd>Use A for one group, or A, B to compare groups.</dd></div><div><dt>Scale</dt><dd>Typical lifetime scale, in operating hours.</dd></div><div><dt>Weibull shape</dt><dd>Controls how failure risk changes over time.</dd></div><div><dt>Random seed</dt><dd>Optional number to reproduce the same sample.</dd></div></dl>
+        <p className="notice"><b>Simulated results</b><br/>The generated sample is illustrative and is not an exact forecast for individual machines.</p>
       </Section>
     </div>
-    <Section title="Active dataset records" subtitle={`${rows.length} records · showing up to 12 matching rows`} action={<label className="search-control"><span>Search</span><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Machine or group"/></label>}>
+    {id&&<Section title="Active dataset records" subtitle={`${rows.length} records · showing up to 12 matching rows`} action={<label className="search-control"><span>Search</span><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Machine or group"/></label>}>
       {loadingRows?<p className="muted">Loading dataset records…</p>:<div className="data-table-wrap"><table className="data-table"><thead><tr><th>Machine ID</th><th>Group</th><th>Operating hours</th><th>Failure time</th><th>Status</th><th>Condition</th></tr></thead><tbody>{filtered.map(r=><tr key={r.machine_id}><td><b>{r.machine_id}</b></td><td>{r.machine_group}</td><td>{Number(r.operating_hours).toFixed(2)} h</td><td>{Number(r.failure_time).toFixed(2)} h</td><td><span className={`status-pill ${r.failure_status?'observed':'censored'}`}>{r.failure_status?'Failed':'Censored'}</span></td><td>{r.operating_condition}</td></tr>)}{!filtered.length&&<tr><td colSpan="6" className="empty-cell">No matching records.</td></tr>}</tbody></table></div>}
-    </Section>
+    </Section>}
+    {sets.length>0&&!id&&<p className="muted">Your saved datasets remain available in the dataset selector.</p>}
   </>;
 }
 
@@ -243,6 +266,7 @@ function Distributions({data}) {
 function FTest({id,data}) {
   const [a,setA]=useState(data.groups[0]?.group||'A'),[b,setB]=useState(data.groups[1]?.group||'B'),[r,setR]=useState(null),[err,setErr]=useState(''),[loading,setLoading]=useState(false);
   async function run(){setLoading(true);try{setR(await api.ftest({dataset_id:Number(id),group_a:a,group_b:b,alpha:.05}));setErr('')}catch(e){setErr(e.message)}finally{setLoading(false)}}
+  if(data.groups.length<2)return <><PageIntro eyebrow="HYPOTHESIS TESTING" title="Variance comparison · F-test" description="The F-test compares the variability of two machine groups."/><Section title="Two groups are needed" subtitle="Your current dataset contains only one group."><p className="muted">Run a new simulation with at least two group names, such as A, B, to compare their sample variances.</p><Link className="button button-primary" to="/simulation">Update simulation settings</Link></Section></>;
   return <>
     <PageIntro eyebrow="HYPOTHESIS TESTING" title="Variance comparison · F-test" description="Assess whether two machine groups show evidence of different failure-time variances."/>
     <Section title="Test specification" subtitle="Classical two-sided F test · significance level α = 0.05">

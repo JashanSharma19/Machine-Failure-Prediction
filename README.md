@@ -41,7 +41,7 @@ npm install
 npm run dev
 ```
 
-Open the Vite URL (normally `http://localhost:5173`). The UI creates a reproducible starter dataset on first use. SQLite persists datasets in `backend/machinepred.db`. API docs are at `http://localhost:8000/docs`.
+Open the Vite URL (normally `http://localhost:5173`). No demo dataset is created automatically; enter simulation settings in Data Simulation and select **Run simulation and analyze**. SQLite persists datasets in `backend/machinepred.db`. API docs are at `http://localhost:8000/docs`.
 
 Optional frontend API override: create `frontend/.env` with `VITE_API_URL=http://localhost:8000/api`. The default `/api` URL works with Vercel's same-domain rewrite and with `vercel dev`.
 

@@ -52,7 +52,8 @@ def health(): return {"status":"online","mode":"deterministic statistical engine
 def datasets(db:Session=Depends(db_session)): return [{"id":d.id,"name":d.name,"created_at":str(d.created_at)} for d in db.query(Dataset).order_by(Dataset.id.desc()).all()]
 @app.post("/api/datasets")
 def create_dataset(req:GenerateRequest,db:Session=Depends(db_session)):
-    if len(set(req.groups))<2: raise HTTPException(422,"Provide at least two unique groups")
+    if any(not g.strip() for g in req.groups) or len(set(req.groups))!=len(req.groups):
+        raise HTTPException(422,"Provide non-empty, unique machine group names.")
     config=req.model_dump(); df=generate(config); ds=Dataset(name=f"Simulated {req.distribution.title()} · {req.count} machines",config=json.dumps(config),rows=df.to_json(orient="records")); db.add(ds); db.commit(); db.refresh(ds)
     return {"id":ds.id,"name":ds.name,"config":config,"rows":json.loads(ds.rows)}
 @app.get("/api/datasets/{dataset_id}")

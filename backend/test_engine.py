@@ -4,10 +4,16 @@ from statistical_analysis import analyze
 from distribution_analysis import fit
 from f_test import compare
 from reliability import survival, predict
+from schemas import GenerateRequest
 
 def test_seeded_simulation_reproducible():
     cfg={"seed":7,"count":50,"groups":["A","B"],"distribution":"exponential","scale":100,"shape":1.5,"censoring":False}
     assert generate(cfg).equals(generate(cfg))
+
+def test_simulation_accepts_a_single_group():
+    req=GenerateRequest(count=50,groups=["A"],distribution="weibull",scale=100,shape=1.5,seed=4)
+    df=generate(req.model_dump())
+    assert len(df)==50 and set(df.machine_group)=={"A"}
 
 def test_sample_variance_uses_n_minus_one():
     df=pd.DataFrame({"failure_time":[1.,2.,3.],"failure_status":[1,1,1]})

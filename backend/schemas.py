@@ -3,7 +3,7 @@ from typing import Literal
 
 class GenerateRequest(BaseModel):
     count: int = Field(200, ge=50, le=1000)
-    groups: list[str] = Field(default_factory=lambda: ["A", "B", "C"], min_length=2, max_length=8)
+    groups: list[str] = Field(default_factory=lambda: ["A", "B", "C"], min_length=1, max_length=8)
     distribution: Literal["exponential", "weibull"] = "weibull"
     scale: float = Field(500, gt=0)
     shape: float = Field(1.7, gt=0)
