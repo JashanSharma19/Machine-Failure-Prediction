@@ -23,7 +23,7 @@ def test_distribution_fits_and_aic():
 
 def test_f_test_basic_and_two_sided():
     df=pd.DataFrame({"machine_group":["A"]*4+["B"]*4,"failure_status":[1]*8,"failure_time":[1.,2.,3.,4.,2.,4.,6.,8.]})
-    result=compare(df,"A","B"); assert result["f_statistic"]==.25 and 0<=result["p_value"]<=1
+    result=compare(df,"A","B"); assert result["f_statistic"]==.25 and 0<=result["p_value"]<=1 and type(result["significant"]) is bool
 
 def test_reliability_and_conditional_formula():
     m={"name":"exponential","parameters":{"rate_lambda":.01}}
