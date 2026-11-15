@@ -8,3 +8,4 @@ pydantic
 reportlab
 matplotlib
 pytest
+psycopg[binary]

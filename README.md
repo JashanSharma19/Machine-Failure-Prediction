@@ -43,7 +43,15 @@ npm run dev
 
 Open the Vite URL (normally `http://localhost:5173`). The UI creates a reproducible starter dataset on first use. SQLite persists datasets in `backend/machinepred.db`. API docs are at `http://localhost:8000/docs`.
 
-Optional frontend API override: create `frontend/.env` with `VITE_API_URL=http://localhost:8000/api`.
+Optional frontend API override: create `frontend/.env` with `VITE_API_URL=http://localhost:8000/api`. The default `/api` URL works with Vercel's same-domain rewrite and with `vercel dev`.
+
+## Deploy to Vercel
+
+The root `vercel.json` defines a `backend` FastAPI service and a `frontend` Vite service. `/api/*` is routed to FastAPI and all other paths go to the frontend. The browser calls the public same-domain `/api` route, so no internal service binding is needed; bindings are for server-side service-to-service calls, and this frontend is a browser SPA.
+
+SQLite is suitable for local development only. Vercel functions have ephemeral filesystems, so set `DATABASE_URL` in the Vercel project to a persistent PostgreSQL connection string before relying on saved datasets. The application supports PostgreSQL through `psycopg`.
+
+Install the Vercel CLI and run `vercel dev` from the repository root to exercise both services locally. Vercel Services are currently documented as beta; check your account/project support before deploying.
 
 ## Workflow and API
 
